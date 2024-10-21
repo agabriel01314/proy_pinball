@@ -12,7 +12,6 @@ const int refreshRate = 50; // Tasa de refresco de la pantalla
 
 mutex mtx;
 
-
 struct GameState {
     int ballX, ballY;          
     int ballDirX, ballDirY;    
@@ -55,7 +54,7 @@ void setup(GameState& state) {
 
 // Función para dibujar el tablero
 void draw(const GameState& state) {
-    mtx.lock();
+    lock_guard<mutex> lock(mtx);
     gotoXY(0, 0);
 
     // Dibuja la parte superior del tablero
@@ -84,8 +83,6 @@ void draw(const GameState& state) {
 
     cout << "Puntuacion: " << state.score << endl;
     cout << "Potencia de lanzamiento: " << state.launchPower << endl;
-
-    mtx.unlock();
 }
 
 // Función para actualizar el movimiento de la bola y las colisiones
@@ -121,25 +118,27 @@ void handleInput(GameState& state) {
     while (!state.gameOver) {
         if (_kbhit()) {
             char key = _getch();
-            mtx.lock();
-            if (key == 'a') state.flipperLeftActive = true;
-            if (key == 'd') state.flipperRightActive = true;
-            if (key == 'p' && !state.ballLaunched) {
-                if (state.launchPower < 10) state.launchPower++;
+            {
+                lock_guard<mutex> lock(mtx);
+                if (key == 'a') state.flipperLeftActive = true;
+                if (key == 'd') state.flipperRightActive = true;
+                if (key == 'p' && !state.ballLaunched) {
+                    if (state.launchPower < 10) state.launchPower++;
+                }
+                if (key == 32 && !state.ballLaunched) {
+                    state.ballLaunched = true;
+                    state.ballDirX = -1;
+                    state.ballDirY = state.launchPower / 3;
+                }
             }
-            if (key == 32 && !state.ballLaunched) {
-                state.ballLaunched = true;
-                state.ballDirX = -1;
-                state.ballDirY = state.launchPower / 3;
-            }
-            mtx.unlock();
         }
 
         // Verificar si las teclas siguen presionadas para bajar las paletas
-        mtx.lock();
-        if (!GetAsyncKeyState('A')) state.flipperLeftActive = false;
-        if (!GetAsyncKeyState('D')) state.flipperRightActive = false;
-        mtx.unlock();
+        {
+            lock_guard<mutex> lock(mtx);
+            if (!GetAsyncKeyState('A')) state.flipperLeftActive = false;
+            if (!GetAsyncKeyState('D')) state.flipperRightActive = false;
+        }
 
         this_thread::sleep_for(chrono::milliseconds(50));
     }
@@ -148,9 +147,10 @@ void handleInput(GameState& state) {
 // Hilo para la lógica del juego
 void gameLogic(GameState& state) {
     while (!state.gameOver) {
-        mtx.lock();
-        updateBall(state);
-        mtx.unlock();
+        {
+            lock_guard<mutex> lock(mtx);
+            updateBall(state);
+        }
         this_thread::sleep_for(chrono::milliseconds(50));  //Velocidad de la lógica
     }
 }
