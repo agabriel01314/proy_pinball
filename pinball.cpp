@@ -3,23 +3,26 @@
 #include <mutex>
 #include <conio.h>
 #include <windows.h>
+#include <cstdlib>  // Para usar rand() y generar números aleatorios
 
 using namespace std;
 
-const int width = 40; // Ancho del tablero
-const int height = 20; // Alto del tablero
-const int refreshRate = 50; // Tasa de refresco de la pantalla
+const int width = 40;  // Ancho del tablero
+const int height = 20;  // Alto del tablero
+const int refreshRate = 50;  // Tasa de refresco de la pantalla
 
 mutex mtx;
 
 struct GameState {
-    int ballX, ballY;          
-    int ballDirX, ballDirY;    
-    bool ballLaunched;         
+    int ballX, ballY;        
+    int ballDirX, ballDirY;  
+    bool ballLaunched;       
     bool flipperLeftActive, flipperRightActive; 
-    int score;                 
-    int launchPower;           
-    bool gameOver;             
+    int score;               
+    int launchPower;         
+    bool gameOver;           
+    int ballSpeed;       
+    int lives;               
 };
 
 void hideCursor() {
@@ -49,6 +52,8 @@ void setup(GameState& state) {
     state.flipperRightActive = false;
     state.score = 0;
     state.launchPower = 0;
+    state.ballSpeed = 1;  // Velocidad inicial de la bola
+    state.lives = 3;      // Inicializamos con 3 vidas
     hideCursor();
 }
 
@@ -66,12 +71,20 @@ void draw(const GameState& state) {
         for (int x = 0; x < width; x++) {
             if (x == 0 || x == width - 1) cout << "#"; // Bordes
             else if (x == state.ballX && y == state.ballY) cout << "O"; // Bola
-            else if (y == height - 1 && (x >= width / 4 - 2 && x <= width / 4 + 2)) cout << "|"; // Flippers no activados
-            else if (y == height - 1 && (x >= 3 * width / 4 - 2 && x <= 3 * width / 4 + 2)) cout << "|"; // Flippers no activados
-            else if (y == height - 2 && state.flipperLeftActive && (x >= width / 4 - 2 && x <= width / 4 + 2)) cout << "/"; // Pala izquierda activada
-            else if (y == height - 2 && state.flipperRightActive && (x >= 3 * width / 4 - 2 && x <= 3 * width / 4 + 2)) cout << "\\"; // Pala derecha activada
-            else if (x == width - 2 && y == height / 2) cout << "L";  // Lanzador
-            else if (x == width - 2 && y == state.ballY && !state.ballLaunched) cout << "O";  // Bola en lanzador
+            else if (y == height - 1 && (x >= width / 4 - 2 && x <= width / 4 + 2)) cout << "|"; // Flipper izquierdo
+            else if (y == height - 1 && (x >= 3 * width / 4 - 2 && x <= 3 * width / 4 + 2)) cout << "|"; // Flipper derecho
+            else if (y == height - 2 && state.flipperLeftActive && (x >= width / 4 - 2 && x <= width / 4 + 2)) cout << "/"; // Flipper izquierdo activado
+            else if (y == height - 2 && state.flipperRightActive && (x >= 3 * width / 4 - 2 && x <= 3 * width / 4 + 2)) cout << "\\"; // Flipper derecho activado
+            else if (x == width - 2 && y == height / 2) cout << "L"; // Lanzador
+            else if (x == width - 2 && y == state.ballY && !state.ballLaunched) cout << "O"; // Bola en lanzador
+
+            // Zonas de plataformas de rebote
+            else if (y == 5 && (x >= 10 && x <= 15)) cout << "^";  // Plataforma de rebote
+            else if (y == 8 && (x >= 20 && x <= 25)) cout << "^";  // Otra plataforma de rebote
+
+            // Zonas de plataformas de aceleración
+            else if (y == 12 && (x >= 10 && x <= 15)) cout << ">";  // Plataforma de aceleración
+
             else cout << " ";
         }
         cout << endl;
@@ -81,37 +94,91 @@ void draw(const GameState& state) {
     for (int i = 0; i < width + 2; i++) cout << "#";
     cout << endl;
 
+    // Mostrar puntuación, potencia de lanzamiento y vidas restantes
     cout << "Puntuacion: " << state.score << endl;
     cout << "Potencia de lanzamiento: " << state.launchPower << endl;
+    cout << "Vidas restantes: " << state.lives << endl;
 }
 
-// Función para actualizar el movimiento de la bola y las colisiones
 void updateBall(GameState& state) {
     if (state.ballLaunched) {
-        state.ballX += state.ballDirX;
-        state.ballY += state.ballDirY;
+        state.ballX += state.ballDirX * state.ballSpeed;
+        state.ballY += state.ballDirY * state.ballSpeed;
 
         // Rebotes en bordes
-        if (state.ballY == 0 || state.ballY == height - 1) state.ballDirY *= -1;
-        if (state.ballX == 0 || state.ballX == width - 1) state.ballDirX *= -1;
+        if (state.ballY == 0 || state.ballY == height - 1) {
+            state.ballDirY *= -1;
+
+            // Cambio aleatorio en dirección X tras un rebote en el borde
+            if (rand() % 2 == 0) {
+                state.ballDirX += (rand() % 3 - 1);  // -1, 0 o 1
+            }
+        }
+
+        if (state.ballX == 0 || state.ballX == width - 1) {
+            state.ballDirX *= -1;
+
+            // Cambio aleatorio en dirección Y tras un rebote en el borde
+            if (rand() % 2 == 0) {
+                state.ballDirY += (rand() % 3 - 1);  // -1, 0 o 1
+            }
+        }
 
         // Colisiones con las paletas
         if (state.ballY == height - 2) {
-            if (state.ballX >= width / 4 - 2 && state.ballX <= width / 4 + 2 && state.flipperLeftActive) {
+            if (state.ballX >= width / 4 - 4 && state.ballX <= width / 4 + 4 && state.flipperLeftActive) {
                 state.ballDirY = -1;
                 state.ballDirX = -1;
                 state.score += 10;
             }
-            if (state.ballX >= 3 * width / 4 - 2 && state.ballX <= 3 * width / 4 + 2 && state.flipperRightActive) {
+            if (state.ballX >= 3 * width / 4 - 4 && state.ballX <= 3 * width / 4 + 4 && state.flipperRightActive) {
                 state.ballDirY = -1;
                 state.ballDirX = 1;
                 state.score += 10;
             }
         }
 
-        if (state.ballY == height - 1) state.gameOver = true;
+        // Colisiones con las plataformas de rebote
+        if (state.ballY == 5 && (state.ballX >= 10 && state.ballX <= 15)) {
+            state.ballDirY *= -1;
+            state.score += 50;
+
+            // Cambio aleatorio de dirección tras el rebote
+            state.ballDirX += (rand() % 3 - 1);  // -1, 0 o 1
+        }
+        if (state.ballY == 8 && (state.ballX >= 20 && state.ballX <= 25)) {
+            state.ballDirY *= -1;
+            state.score += 50;
+
+            // Cambio aleatorio de dirección tras el rebote
+            state.ballDirX += (rand() % 3 - 1);  // -1, 0 o 1
+        }
+
+        // Colisiones con plataformas de aceleración
+        if (state.ballY == 12 && (state.ballX >= 10 && state.ballX <= 15)) {
+            state.ballSpeed = 2;  // Aumentar la velocidad
+            state.score += 100;
+        } else {
+            state.ballSpeed = 1;  // Restaurar la velocidad
+        }
+
+        // Si la bola cae al fondo del tablero
+        if (state.ballY == height - 1) {
+            state.lives--;
+            if (state.lives > 0) {
+                state.ballLaunched = false;
+                state.ballX = width - 2;
+                state.ballY = height / 2;
+                state.ballDirX = 0;
+                state.ballDirY = 0;
+                state.launchPower = 0;  // Reiniciar la potencia de lanzamiento
+            } else {
+                state.gameOver = true;
+            }
+        }
     }
 }
+
 
 // Función para manejar las entradas del jugador
 void handleInput(GameState& state) {
@@ -151,11 +218,10 @@ void gameLogic(GameState& state) {
             lock_guard<mutex> lock(mtx);
             updateBall(state);
         }
-        this_thread::sleep_for(chrono::milliseconds(50));  //Velocidad de la lógica
+        this_thread::sleep_for(chrono::milliseconds(50));  // Velocidad de la lógica
     }
 }
 
-// Hilo para el renderizado
 void render(GameState& state) {
     while (!state.gameOver) {
         draw(state);
@@ -178,6 +244,7 @@ int main() {
     gotoXY(0, height + 2);
     cout << "GAME OVER" << endl;
     cout << "Puntuacion final: " << state.score << endl;
+    cout << "Vidas restantes: " << state.lives << endl;
 
     return 0;
 }
