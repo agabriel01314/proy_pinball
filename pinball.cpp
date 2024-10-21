@@ -138,7 +138,7 @@ void handleInput(GameState& state) {
         // Verificar si las teclas siguen presionadas para bajar las paletas
         mtx.lock();
         if (!GetAsyncKeyState('A')) state.flipperLeftActive = false;
-        if (!GetAsyncKeyState('L')) state.flipperRightActive = false;
+        if (!GetAsyncKeyState('D')) state.flipperRightActive = false;
         mtx.unlock();
 
         this_thread::sleep_for(chrono::milliseconds(50));
