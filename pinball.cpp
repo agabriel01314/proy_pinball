@@ -123,11 +123,11 @@ void handleInput(GameState& state) {
             char key = _getch();
             mtx.lock();
             if (key == 'a') state.flipperLeftActive = true;
-            if (key == 'l') state.flipperRightActive = true;
+            if (key == 'd') state.flipperRightActive = true;
             if (key == 'p' && !state.ballLaunched) {
                 if (state.launchPower < 10) state.launchPower++;
             }
-            if (key == 'r' && !state.ballLaunched) {
+            if (key == 32 && !state.ballLaunched) {
                 state.ballLaunched = true;
                 state.ballDirX = -1;
                 state.ballDirY = state.launchPower / 3;
