@@ -31,8 +31,8 @@ void showMenu(GameState& state) {
     cout << "Bienvenido al Pinball!\n";
     cout << "Selecciona un modo de juego:\n";
     cout << "1. Modo Lento\n";
-    cout << "2. Modo Rápido\n";
-    cout << "Opción: ";
+    cout << "2. Modo Rapido\n";
+    cout << "Opcion: ";
     cin >> option;
 
     if (option == 1) {
@@ -122,7 +122,6 @@ void draw(const GameState& state) {
 
     // Mostrar puntuación, potencia de lanzamiento y vidas restantes
     cout << "Puntuacion: " << state.score << endl;
-    cout << "Potencia de lanzamiento: " << state.launchPower << endl;
     cout << "Vidas restantes: " << state.lives << endl;
 }
 
