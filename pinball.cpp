@@ -25,8 +25,10 @@ struct GameState {
     int launchPower;           ///< Potencia del lanzamiento
     bool gameOver;             ///< Estado del juego (terminado o no)
     int ballSpeed;             ///< Velocidad de la bola
-    int lives;                 ///< Número de vidas restantes            
+    int lives;                 ///< Número de vidas restantes
+    int winningScore;          ///< Puntuación para ganar el juego
 };
+
 
 /**
  * @brief Muestra el menú de selección de modo de juego.
@@ -87,9 +89,11 @@ void setup(GameState& state) {
     state.flipperRightActive = false;
     state.score = 0;
     state.launchPower = 0;
-    state.lives = 3;      // Inicializamos con 3 vidas
+    state.lives = 3;
+    state.winningScore = 50;  
     hideCursor();
 }
+
 
 /**
  * @brief Dibuja el tablero de juego en función del estado actual.
@@ -225,6 +229,11 @@ void updateBall(GameState& state) {
             state.ballDirX = -1;  // Rebote diagonal hacia la izquierda
             state.ballDirY = -1;  // Rebote hacia arriba
         }
+
+        if (state.score >= state.winningScore) {
+            state.gameOver = true;  // End the game if the player reaches the winning score
+            cout << "¡Felicidades, has ganado!" << endl;
+        }
     }
 }
 
@@ -280,6 +289,38 @@ void gameLoop(GameState& state) {
         this_thread::sleep_for(chrono::milliseconds(refreshRate));
     }
 }
+/**
+ * @brief Muestra la pantalla de ganador o perdedor.
+ * @param won Indica si el jugador ha ganado (true) o perdido (false).
+ * @param state Referencia al estado del juego.
+ */
+void gameOverScreen(bool won, const GameState& state) {
+    system("cls"); // Limpia la pantalla
+    if (won) {
+        cout << "¡Felicidades, has ganado!" << endl;
+        cout << "Puntaje final: " << state.winningScore << endl; // Accede al winningScore desde el estado del juego
+    } else {
+        cout << "Has perdido todas tus vidas." << endl;
+        cout << "Mejor suerte la próxima vez." << endl;
+    }
+    cout << "Presiona cualquier tecla para salir..." << endl;
+    _getch(); // Espera una tecla para finalizar
+}
+
+/**
+ * @brief Verifica si el jugador ha ganado o perdido, y muestra la pantalla correspondiente.
+ * @param state Estado del juego.
+ */
+void checkGameOver(GameState& state) {
+    if (state.score >= state.winningScore) {
+        state.gameOver = true;
+        gameOverScreen(true, state); // Pantalla de ganador
+    } else if (state.lives <= 0) {
+        state.gameOver = true;
+        gameOverScreen(false, state); // Pantalla de perdedor
+    }
+}
+
 /**
  * @brief Función principal que ejecuta el juego.
  * @return Código de salida del programa.
