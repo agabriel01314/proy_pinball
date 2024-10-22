@@ -25,6 +25,25 @@ struct GameState {
     int lives;               
 };
 
+// Función para mostrar el menú y permitir al jugador seleccionar el modo de juego
+void showMenu(GameState& state) {
+    int option;
+    cout << "Bienvenido al Pinball!\n";
+    cout << "Selecciona un modo de juego:\n";
+    cout << "1. Modo Lento\n";
+    cout << "2. Modo Rápido\n";
+    cout << "Opción: ";
+    cin >> option;
+
+    if (option == 1) {
+        state.ballSpeed = 1;  // Modo lento (más lento)
+        cout << "Has seleccionado el Modo Lento. ¡Buena suerte!\n";
+    } else {
+        state.ballSpeed = 2;  // Modo rápido (velocidad normal)
+        cout << "Has seleccionado el Modo Rápido. ¡Buena suerte!\n";
+    }
+}
+
 void hideCursor() {
     HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO info;
@@ -52,7 +71,6 @@ void setup(GameState& state) {
     state.flipperRightActive = false;
     state.score = 0;
     state.launchPower = 0;
-    state.ballSpeed = 1;  // Velocidad inicial de la bola
     state.lives = 3;      // Inicializamos con 3 vidas
     hideCursor();
 }
@@ -86,6 +104,10 @@ void draw(const GameState& state) {
             // Zonas de plataformas de aceleración
             else if (y == 12 && (x >= 10 && x <= 15)) cout << ">";  // Plataforma de aceleración
 
+            // Plataformas diagonales
+            else if (y == 10 && (x >= 5 && x <= 7)) cout << "/";  // Plataforma diagonal en la posición (10, 5-7)
+            else if (y == 14 && (x >= 30 && x <= 32)) cout << "/";  // Plataforma diagonal en la posición (14, 30-32)
+
             else cout << " ";
         }
         cout << endl;
@@ -104,7 +126,16 @@ void draw(const GameState& state) {
     cout << "Vidas restantes: " << state.lives << endl;
 }
 
+// Resetea la posición de la bola para un nuevo lanzamiento
+void resetBall(GameState& state) {
+    state.ballLaunched = false;
+    state.ballX = width - 2;
+    state.ballY = height / 2;
+    state.ballDirX = 0;
+    state.ballDirY = 0;
+}
 
+// Función para actualizar la posición de la pelota y detectar colisiones
 void updateBall(GameState& state) {
     if (state.ballLaunched) {
         // Mover la bola
@@ -112,12 +143,18 @@ void updateBall(GameState& state) {
         state.ballY += state.ballDirY * state.ballSpeed;
 
         // Rebotes en los bordes superior e inferior
-        if (state.ballY == 0 || state.ballY == height - 1) {
-            state.ballDirY *= -1;
-
-            // Cambio aleatorio en dirección X tras un rebote en el borde
-            if (rand() % 2 == 0) {
-                state.ballDirX += (rand() % 3 - 1);  // -1, 0 o 1
+        if (state.ballY == 0) {
+            state.ballDirY *= -1;  // Rebote en el borde superior
+        } else if (state.ballY == height - 1) {
+            if (state.ballX > width / 4 + 2 && state.ballX < 3 * width / 4 - 2) {
+                state.lives--;  // Perder una vida
+                if (state.lives <= 0) {
+                    state.gameOver = true;
+                } else {
+                    resetBall(state);  // Respawn de la bola
+                }
+            } else {
+                state.ballDirY *= -1;  // Rebote en las paredes laterales
             }
         }
 
@@ -137,8 +174,7 @@ void updateBall(GameState& state) {
                 int deltaX = state.ballX - (width / 4);
                 state.ballDirX = deltaX / 2;
                 state.score += 10;
-            }
-            if (state.ballX >= 3 * width / 4 - 4 && state.ballX <= 3 * width / 4 + 4 && state.flipperRightActive) {
+            } else if (state.ballX >= 3 * width / 4 - 4 && state.ballX <= 3 * width / 4 + 4 && state.flipperRightActive) {
                 state.ballDirY = -1;
                 int deltaX = state.ballX - (3 * width / 4);
                 state.ballDirX = deltaX / 2;
@@ -146,112 +182,71 @@ void updateBall(GameState& state) {
             }
         }
 
-        // Colisiones con las plataformas de rebote
-        if (state.ballY == 5 && (state.ballX >= 10 && state.ballX <= 15)) {
-            state.ballDirY *= -1;
-            state.score += 50;
-
-            // Cambio aleatorio de dirección tras el rebote
-            state.ballDirX += (rand() % 3 - 1);
-        }
-        if (state.ballY == 8 && (state.ballX >= 20 && state.ballX <= 25)) {
-            state.ballDirY *= -1;
-            state.score += 50;
-
-            // Cambio aleatorio de dirección tras el rebote
-            state.ballDirX += (rand() % 3 - 1);
+        // Colisiones con plataformas '^' (rebote vertical)
+        if ((state.ballY == 5 && state.ballX >= 10 && state.ballX <= 15) || (state.ballY == 8 && state.ballX >= 20 && state.ballX <= 25)) {
+            state.ballDirY *= -1;  // Rebote en la dirección opuesta
         }
 
-        // Colisiones con plataformas de aceleración
-        if (state.ballY == 12 && (state.ballX >= 10 && state.ballX <= 15)) {
-            state.ballSpeed = 2;  // Aumentar la velocidad
-            state.score += 100;
-        } else {
-            state.ballSpeed = 1;  // Restaurar la velocidad
+        // Colisiones con plataformas '>' (aceleración horizontal)
+        if (state.ballY == 12 && state.ballX >= 10 && state.ballX <= 15) {
+            state.ballDirX = 2;  // Aceleración hacia la derecha
         }
 
-        // Si la bola llega al fondo (última fila del tablero)
-        if (state.ballY == height - 1) {
-            // Verificar si la bola está en el centro vacío entre los flippers
-            if (state.ballX > width / 4 - 2 && state.ballX < 3 * width / 4 + 2) {
-                // La bola cae en el centro vacío
-                state.lives--;  // Perder una vida
+        // Colisiones con plataformas '/' (rebote diagonal)
+        if (state.ballY == 10 && state.ballX >= 5 && state.ballX <= 7) {
+            state.ballDirX = 1;  // Rebote diagonal hacia la derecha
+            state.ballDirY = -1; // Rebote hacia arriba
+        }
+        if (state.ballY == 14 && state.ballX >= 30 && state.ballX <= 32) {
+            state.ballDirX = -1;  // Rebote diagonal hacia la izquierda
+            state.ballDirY = -1;  // Rebote hacia arriba
+        }
+    }
+}
 
-                if (state.lives > 0) {
-                    // Reiniciar la bola si aún quedan vidas
-                    state.ballLaunched = false;
-                    state.ballX = width - 2;
-                    state.ballY = height / 2;
-                    state.ballDirX = 0;
-                    state.ballDirY = 0;
-                    state.launchPower = 0;
-                    
-                    // Pequeña pausa para reiniciar después de perder una vida
-                    this_thread::sleep_for(chrono::seconds(2));
-                } else {
-                    // Si ya no hay más vidas, terminar el juego
-                    state.gameOver = true;
-                    cout << "¡Juego terminado! No te quedan más vidas." << endl;
-                }
+// Captura la entrada del jugador
+void input(GameState& state) {
+    if (_kbhit()) {
+        char key = _getch();
+
+        if (!state.ballLaunched) {
+            if (key == ' ') {
+                state.ballLaunched = true;
+                state.ballDirX = -1 + rand() % 3;  // Dirección aleatoria
+                state.ballDirY = -1;  // Hacia arriba
+            } else if (key == 'w') {
+                state.launchPower++;  // Aumentar la potencia de lanzamiento
+            } else if (key == 's') {
+                state.launchPower--;  // Disminuir la potencia de lanzamiento
+            }
+        }
+
+        if (key == 'a') {
+            state.flipperLeftActive = true;
+        } else if (key == 'd') {
+            state.flipperRightActive = true;
+        }
+
+        // Función de la tecla 'u' para perder una vida y reiniciar la bola
+        if (key == 'u') {
+            state.lives--;
+            if (state.lives <= 0) {
+                state.gameOver = true;
             } else {
-                // Si la bola cae en los bordes, rebotar
-                state.ballDirY *= -1;
+                resetBall(state);  // Respawn de la bola
             }
         }
+    } else {
+        state.flipperLeftActive = false;
+        state.flipperRightActive = false;
     }
 }
 
-
-// Función para manejar las entradas del jugador
-void handleInput(GameState& state) {
-    while (!state.gameOver) {
-        if (_kbhit()) {
-            char key = _getch();
-            {
-                lock_guard<mutex> lock(mtx);
-                if (key == 'a') {
-                    state.flipperLeftActive = true;  // Activa el flipper izquierdo
-                }
-                if (key == 'd') {
-                    state.flipperRightActive = true; // Activa el flipper derecho
-                }
-                if (key == 'p') {
-                    state.launchPower += (state.launchPower < 10) ? 1 : 0; // Aumentar potencia de lanzamiento
-                }
-                if (key == ' ' && !state.ballLaunched) {
-                    state.ballLaunched = true;
-                    state.ballDirX = (rand() % 2 == 0) ? 1 : -1; // Direcciones aleatorias
-                    state.ballDirY = -1; // Lanzar hacia arriba
-                }
-                if (key == 'q') state.gameOver = true; // Salir del juego
-            }
-        }
-
-        // Desactiva las palancas si no se presionan las teclas correspondientes
-        {
-            lock_guard<mutex> lock(mtx);
-            state.flipperLeftActive = GetAsyncKeyState('A') & 0x8000;  // Activar flipper izquierdo si 'A' está presionada
-            state.flipperRightActive = GetAsyncKeyState('D') & 0x8000; // Activar flipper derecho si 'D' está presionada
-        }
-
-        // Pequeña pausa para no sobrecargar el CPU
-        this_thread::sleep_for(chrono::milliseconds(10));
-    }
-}
-// Hilo para la lógica del juego
-void gameLogic(GameState& state) {
-    while (!state.gameOver) {
-        {
-            lock_guard<mutex> lock(mtx);
-            updateBall(state);
-        }
-        this_thread::sleep_for(chrono::milliseconds(50));  // Velocidad de la lógica
-    }
-}
-
-void render(GameState& state) {
+void gameLoop(GameState& state) {
     while (!state.gameOver) {
         draw(state);
+        input(state);
+        updateBall(state);
         this_thread::sleep_for(chrono::milliseconds(refreshRate));
     }
 }
@@ -259,19 +254,8 @@ void render(GameState& state) {
 int main() {
     GameState state;
     setup(state);
-
-    thread gameThread(gameLogic, ref(state));
-    thread inputThread(handleInput, ref(state));
-    thread renderThread(render, ref(state));
-
-    gameThread.join();
-    inputThread.join();
-    renderThread.join();
-
-    gotoXY(0, height + 2);
-    cout << "GAME OVER" << endl;
-    cout << "Puntuacion final: " << state.score << endl;
-    cout << "Vidas restantes: " << state.lives << endl;
-
+    showMenu(state);
+    gameLoop(state);
+    cout << "Juego terminado! Puntuacion final: " << state.score << endl;
     return 0;
 }
