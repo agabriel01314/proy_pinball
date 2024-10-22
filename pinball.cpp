@@ -115,25 +115,27 @@ void updateBall(GameState& state) {
             }
         }
 
-        if (state.ballX == 0 || state.ballX == width - 1) {
-            state.ballDirX *= -1;
-
-            // Cambio aleatorio en dirección Y tras un rebote en el borde
-            if (rand() % 2 == 0) {
-                state.ballDirY += (rand() % 3 - 1);  // -1, 0 o 1
-            }
+        // Verifica si la bola ha alcanzado el borde izquierdo
+        if (state.ballX <= 0) {
+            state.ballDirX *= -1; // Rebote al borde izquierdo
+            state.ballX = 0; // Asegurarse de que no se salga del borde
+        } else if (state.ballX >= width - 1) {
+            state.ballDirX *= -1; // Rebote al borde derecho
+            state.ballX = width - 1; // Asegurarse de que no se salga del borde
         }
 
         // Colisiones con las paletas
         if (state.ballY == height - 2) {
             if (state.ballX >= width / 4 - 4 && state.ballX <= width / 4 + 4 && state.flipperLeftActive) {
                 state.ballDirY = -1;
-                state.ballDirX = -1;
+                int deltaX = state.ballX - (width / 4);  // Variación en X según el punto de la paleta
+                state.ballDirX = deltaX / 2;
                 state.score += 10;
             }
             if (state.ballX >= 3 * width / 4 - 4 && state.ballX <= 3 * width / 4 + 4 && state.flipperRightActive) {
                 state.ballDirY = -1;
-                state.ballDirX = 1;
+                int deltaX = state.ballX - (3 * width / 4);
+                state.ballDirX = deltaX / 2;
                 state.score += 10;
             }
         }
@@ -172,6 +174,7 @@ void updateBall(GameState& state) {
                 state.ballDirX = 0;
                 state.ballDirY = 0;
                 state.launchPower = 0;  // Reiniciar la potencia de lanzamiento
+                this_thread::sleep_for(chrono::seconds(2));  // Pausa antes de relanzar
             } else {
                 state.gameOver = true;
             }
@@ -187,30 +190,35 @@ void handleInput(GameState& state) {
             char key = _getch();
             {
                 lock_guard<mutex> lock(mtx);
-                if (key == 'a') state.flipperLeftActive = true;
-                if (key == 'd') state.flipperRightActive = true;
-                if (key == 'p' && !state.ballLaunched) {
-                    if (state.launchPower < 10) state.launchPower++;
+                if (key == 'a') {
+                    state.flipperLeftActive = true;  // Activa el flipper izquierdo
                 }
-                if (key == 32 && !state.ballLaunched) {
+                if (key == 'd') {
+                    state.flipperRightActive = true; // Activa el flipper derecho
+                }
+                if (key == 'p') {
+                    state.launchPower += (state.launchPower < 10) ? 1 : 0; // Aumentar potencia de lanzamiento
+                }
+                if (key == ' ' && !state.ballLaunched) {
                     state.ballLaunched = true;
-                    state.ballDirX = -1;
-                    state.ballDirY = state.launchPower / 3;
+                    state.ballDirX = (rand() % 2 == 0) ? 1 : -1; // Direcciones aleatorias
+                    state.ballDirY = -1; // Lanzar hacia arriba
                 }
+                if (key == 'q') state.gameOver = true; // Salir del juego
             }
         }
 
-        // Verificar si las teclas siguen presionadas para bajar las paletas
+        // Desactiva las palancas si no se presionan las teclas correspondientes
         {
             lock_guard<mutex> lock(mtx);
-            if (!GetAsyncKeyState('A')) state.flipperLeftActive = false;
-            if (!GetAsyncKeyState('D')) state.flipperRightActive = false;
+            state.flipperLeftActive = GetAsyncKeyState('A') & 0x8000;  // Activar flipper izquierdo si 'A' está presionada
+            state.flipperRightActive = GetAsyncKeyState('D') & 0x8000; // Activar flipper derecho si 'D' está presionada
         }
 
-        this_thread::sleep_for(chrono::milliseconds(50));
+        // Pequeña pausa para no sobrecargar el CPU
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
 }
-
 // Hilo para la lógica del juego
 void gameLogic(GameState& state) {
     while (!state.gameOver) {
