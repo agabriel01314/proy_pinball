@@ -7,25 +7,31 @@
 
 using namespace std;
 
-const int width = 40;  // Ancho del tablero
-const int height = 20;  // Alto del tablero
-const int refreshRate = 50;  // Tasa de refresco de la pantalla
+const int width = 40;   ///< Ancho del tablero de juego
+const int height = 20;  ///< Alto del tablero de juego
+const int refreshRate = 50;  ///< Tasa de refresco de la pantalla en milisegundos
 
 mutex mtx;
-
+/**
+ * @struct GameState
+ * @brief Estructura que contiene el estado actual del juego.
+ */
 struct GameState {
-    int ballX, ballY;        
-    int ballDirX, ballDirY;  
-    bool ballLaunched;       
-    bool flipperLeftActive, flipperRightActive; 
-    int score;               
-    int launchPower;         
-    bool gameOver;           
-    int ballSpeed;       
-    int lives;               
+    int ballX, ballY;          ///< Posición actual de la bola
+    int ballDirX, ballDirY;    ///< Dirección de movimiento de la bola
+    bool ballLaunched;         ///< Indica si la bola ha sido lanzada
+    bool flipperLeftActive, flipperRightActive; ///< Estado de los flippers
+    int score;                 ///< Puntuación del jugador
+    int launchPower;           ///< Potencia del lanzamiento
+    bool gameOver;             ///< Estado del juego (terminado o no)
+    int ballSpeed;             ///< Velocidad de la bola
+    int lives;                 ///< Número de vidas restantes            
 };
 
-// Función para mostrar el menú y permitir al jugador seleccionar el modo de juego
+/**
+ * @brief Muestra el menú de selección de modo de juego.
+ * @param state Referencia al estado del juego.
+ */
 void showMenu(GameState& state) {
     int option;
     cout << "Bienvenido al Pinball!\n";
@@ -36,14 +42,17 @@ void showMenu(GameState& state) {
     cin >> option;
 
     if (option == 1) {
-        state.ballSpeed = 1;  // Modo lento (más lento)
+        state.ballSpeed = 1;  ///< Modo lento
         cout << "Has seleccionado el Modo Lento. ¡Buena suerte!\n";
     } else {
-        state.ballSpeed = 2;  // Modo rápido (velocidad normal)
+        state.ballSpeed = 2;  ///< Modo rápido
         cout << "Has seleccionado el Modo Rápido. ¡Buena suerte!\n";
     }
 }
 
+/**
+ * @brief Oculta el cursor de la consola.
+ */
 void hideCursor() {
     HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO info;
@@ -51,7 +60,11 @@ void hideCursor() {
     info.bVisible = FALSE;
     SetConsoleCursorInfo(consoleHandle, &info);
 }
-
+/**
+ * @brief Posiciona el cursor en las coordenadas especificadas de la consola.
+ * @param x Coordenada x (horizontal).
+ * @param y Coordenada y (vertical).
+ */
 void gotoXY(int x, int y) {
     COORD coord;
     coord.X = x;
@@ -59,7 +72,10 @@ void gotoXY(int x, int y) {
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-// Configuración inicial del juego
+/**
+ * @brief Configura el estado inicial del juego.
+ * @param state Referencia al estado del juego.
+ */
 void setup(GameState& state) {
     state.gameOver = false;
     state.ballLaunched = false;
@@ -75,7 +91,10 @@ void setup(GameState& state) {
     hideCursor();
 }
 
-// Función para dibujar el tablero
+/**
+ * @brief Dibuja el tablero de juego en función del estado actual.
+ * @param state Estado del juego.
+ */
 void draw(const GameState& state) {
     lock_guard<mutex> lock(mtx);
     gotoXY(0, 0);
@@ -125,7 +144,10 @@ void draw(const GameState& state) {
     cout << "Vidas restantes: " << state.lives << endl;
 }
 
-// Resetea la posición de la bola para un nuevo lanzamiento
+/**
+ * @brief Resetea la posición de la bola tras perder una vida.
+ * @param state Estado del juego.
+ */
 void resetBall(GameState& state) {
     state.ballLaunched = false;
     state.ballX = width - 2;
@@ -134,7 +156,10 @@ void resetBall(GameState& state) {
     state.ballDirY = 0;
 }
 
-// Función para actualizar la posición de la pelota y detectar colisiones
+/**
+ * @brief Actualiza la posición de la bola y maneja las colisiones.
+ * @param state Estado del juego.
+ */
 void updateBall(GameState& state) {
     if (state.ballLaunched) {
         // Mover la bola
@@ -203,7 +228,10 @@ void updateBall(GameState& state) {
     }
 }
 
-// Captura la entrada del jugador
+/**
+ * @brief Controla el lanzamiento de la bola.
+ * @param state Estado del juego.
+ */
 void input(GameState& state) {
     if (_kbhit()) {
         char key = _getch();
@@ -240,7 +268,10 @@ void input(GameState& state) {
         state.flipperRightActive = false;
     }
 }
-
+/**
+ * @brief Controla la lógica principal del juego y el refresco de la pantalla.
+ * @param state Estado del juego.
+ */
 void gameLoop(GameState& state) {
     while (!state.gameOver) {
         draw(state);
@@ -249,7 +280,10 @@ void gameLoop(GameState& state) {
         this_thread::sleep_for(chrono::milliseconds(refreshRate));
     }
 }
-
+/**
+ * @brief Función principal que ejecuta el juego.
+ * @return Código de salida del programa.
+ */
 int main() {
     GameState state;
     setup(state);
