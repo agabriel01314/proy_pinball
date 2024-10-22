@@ -73,6 +73,7 @@ void draw(const GameState& state) {
             else if (x == state.ballX && y == state.ballY) cout << "O"; // Bola
             else if (y == height - 1 && (x >= width / 4 - 2 && x <= width / 4 + 2)) cout << "|"; // Flipper izquierdo
             else if (y == height - 1 && (x >= 3 * width / 4 - 2 && x <= 3 * width / 4 + 2)) cout << "|"; // Flipper derecho
+            else if (y == height - 1 && (x < width / 4 - 2 || x > 3 * width / 4 + 2)) cout << "#"; // Bordes laterales, centro vacío
             else if (y == height - 2 && state.flipperLeftActive && (x >= width / 4 - 2 && x <= width / 4 + 2)) cout << "/"; // Flipper izquierdo activado
             else if (y == height - 2 && state.flipperRightActive && (x >= 3 * width / 4 - 2 && x <= 3 * width / 4 + 2)) cout << "\\"; // Flipper derecho activado
             else if (x == width - 2 && y == height / 2) cout << "L"; // Lanzador
@@ -90,8 +91,11 @@ void draw(const GameState& state) {
         cout << endl;
     }
 
-    // Dibuja la parte inferior del tablero
-    for (int i = 0; i < width + 2; i++) cout << "#";
+    // Dibuja la parte inferior del tablero (con centro vacío)
+    for (int i = 0; i < width + 2; i++) {
+        if (i < width / 4 - 2 || i > 3 * width / 4 + 2) cout << "#"; // Bordes en los extremos
+        else cout << " "; // Centro vacío
+    }
     cout << endl;
 
     // Mostrar puntuación, potencia de lanzamiento y vidas restantes
@@ -100,12 +104,14 @@ void draw(const GameState& state) {
     cout << "Vidas restantes: " << state.lives << endl;
 }
 
+
 void updateBall(GameState& state) {
     if (state.ballLaunched) {
+        // Mover la bola
         state.ballX += state.ballDirX * state.ballSpeed;
         state.ballY += state.ballDirY * state.ballSpeed;
 
-        // Rebotes en bordes
+        // Rebotes en los bordes superior e inferior
         if (state.ballY == 0 || state.ballY == height - 1) {
             state.ballDirY *= -1;
 
@@ -115,20 +121,20 @@ void updateBall(GameState& state) {
             }
         }
 
-        // Verifica si la bola ha alcanzado el borde izquierdo
+        // Rebotes en los lados
         if (state.ballX <= 0) {
-            state.ballDirX *= -1; // Rebote al borde izquierdo
-            state.ballX = 0; // Asegurarse de que no se salga del borde
+            state.ballDirX *= -1; // Rebote en el borde izquierdo
+            state.ballX = 0;
         } else if (state.ballX >= width - 1) {
-            state.ballDirX *= -1; // Rebote al borde derecho
-            state.ballX = width - 1; // Asegurarse de que no se salga del borde
+            state.ballDirX *= -1; // Rebote en el borde derecho
+            state.ballX = width - 1;
         }
 
         // Colisiones con las paletas
         if (state.ballY == height - 2) {
             if (state.ballX >= width / 4 - 4 && state.ballX <= width / 4 + 4 && state.flipperLeftActive) {
                 state.ballDirY = -1;
-                int deltaX = state.ballX - (width / 4);  // Variación en X según el punto de la paleta
+                int deltaX = state.ballX - (width / 4);
                 state.ballDirX = deltaX / 2;
                 state.score += 10;
             }
@@ -146,14 +152,14 @@ void updateBall(GameState& state) {
             state.score += 50;
 
             // Cambio aleatorio de dirección tras el rebote
-            state.ballDirX += (rand() % 3 - 1);  // -1, 0 o 1
+            state.ballDirX += (rand() % 3 - 1);
         }
         if (state.ballY == 8 && (state.ballX >= 20 && state.ballX <= 25)) {
             state.ballDirY *= -1;
             state.score += 50;
 
             // Cambio aleatorio de dirección tras el rebote
-            state.ballDirX += (rand() % 3 - 1);  // -1, 0 o 1
+            state.ballDirX += (rand() % 3 - 1);
         }
 
         // Colisiones con plataformas de aceleración
@@ -164,19 +170,32 @@ void updateBall(GameState& state) {
             state.ballSpeed = 1;  // Restaurar la velocidad
         }
 
-        // Si la bola cae al fondo del tablero
+        // Si la bola llega al fondo (última fila del tablero)
         if (state.ballY == height - 1) {
-            state.lives--;
-            if (state.lives > 0) {
-                state.ballLaunched = false;
-                state.ballX = width - 2;
-                state.ballY = height / 2;
-                state.ballDirX = 0;
-                state.ballDirY = 0;
-                state.launchPower = 0;  // Reiniciar la potencia de lanzamiento
-                this_thread::sleep_for(chrono::seconds(2));  // Pausa antes de relanzar
+            // Verificar si la bola está en el centro vacío entre los flippers
+            if (state.ballX > width / 4 - 2 && state.ballX < 3 * width / 4 + 2) {
+                // La bola cae en el centro vacío
+                state.lives--;  // Perder una vida
+
+                if (state.lives > 0) {
+                    // Reiniciar la bola si aún quedan vidas
+                    state.ballLaunched = false;
+                    state.ballX = width - 2;
+                    state.ballY = height / 2;
+                    state.ballDirX = 0;
+                    state.ballDirY = 0;
+                    state.launchPower = 0;
+                    
+                    // Pequeña pausa para reiniciar después de perder una vida
+                    this_thread::sleep_for(chrono::seconds(2));
+                } else {
+                    // Si ya no hay más vidas, terminar el juego
+                    state.gameOver = true;
+                    cout << "¡Juego terminado! No te quedan más vidas." << endl;
+                }
             } else {
-                state.gameOver = true;
+                // Si la bola cae en los bordes, rebotar
+                state.ballDirY *= -1;
             }
         }
     }
